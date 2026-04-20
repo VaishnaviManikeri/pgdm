@@ -2,59 +2,81 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
-const path = require('path');
 
 dotenv.config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// ================= TRUST PROXY =================
+app.set('trust proxy', 1);
+
+// ================= CORS CONFIG =================
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://adityainstitutepgdm.com',
+  'https://www.adityainstitutepgdm.com'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS not allowed'));
+    }
+  },
+  credentials: true
+}));
+
+// ================= MIDDLEWARE =================
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
-const authRoutes = require('./routes/authRoutes');
-const galleryRoutes = require('./routes/galleryRoutes');
-const noticeRoutes = require('./routes/noticeRoutes');
-const careerRoutes = require('./routes/careerRoutes');
-const blogRoutes = require('./routes/blogRoutes');
+// ================= ROUTES =================
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/gallery', require('./routes/galleryRoutes'));
+app.use('/api/notices', require('./routes/noticeRoutes'));
+app.use('/api/careers', require('./routes/careerRoutes'));
+app.use('/api/blogs', require('./routes/blogRoutes'));
 
-app.use('/api/auth', authRoutes);
-app.use('/api/gallery', galleryRoutes);
-app.use('/api/notices', noticeRoutes);
-app.use('/api/careers', careerRoutes);
-app.use('/api/blogs', blogRoutes);
+// ================= HEALTH CHECK =================
+app.get('/', (req, res) => {
+  res.send('PGDM Backend Running 🚀');
+});
 
-// MongoDB Connection
+// ================= DATABASE =================
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('MongoDB connected'))
-  .catch(err => console.log('MongoDB connection error:', err));
+  .catch(err => console.log('MongoDB error:', err));
 
-// Create admin user if not exists
+// ================= CREATE ADMIN =================
 const Admin = require('./models/Admin');
 const bcrypt = require('bcryptjs');
 
 const createAdmin = async () => {
   try {
     const adminExists = await Admin.findOne({ email: 'admin@example.com' });
+
     if (!adminExists) {
       const hashedPassword = await bcrypt.hash('admin123', 10);
-      const admin = new Admin({
+
+      await new Admin({
         email: 'admin@example.com',
         password: hashedPassword
-      });
-      await admin.save();
-      console.log('Admin user created - Email: admin@example.com, Password: admin123');
+      }).save();
+
+      console.log('Admin created: admin@example.com / admin123');
     }
-  } catch (error) {
-    console.error('Error creating admin:', error);
+  } catch (err) {
+    console.log('Admin error:', err);
   }
 };
 
 createAdmin();
 
-const PORT = process.env.PORT || 5000;
+// ================= SERVER =================
+const PORT = 5013;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
